@@ -1,0 +1,424 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  SALES
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BKASH
+  NAGAD
+  ROCKET
+  UPAY
+  BANK_TRANSFER
+  CHEQUE
+  OTHER
+}
+
+enum SaleStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  RETURNED
+}
+
+enum StockReason {
+  PURCHASE
+  SALE
+  RETURN
+  ADJUSTMENT
+  OPENING
+  TRANSFER
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  RESIGNED
+  TERMINATED
+  ON_LEAVE
+}
+
+// User/Auth
+
+model User {
+  id         Int       @id @default(autoincrement())
+  name       String
+  email      String    @unique
+  password   String
+  role       Role      @default(SALES)
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  
+  sales       Sale[]      @relation("UserSales")
+  purchases   Purchase[]  @relation("UserPurchases")
+  uploads     EmployeeDocument[] @relation("UserUploads")
+  notificationSettings NotificationSetting[]
+}
+
+// Branch (multi-branch support)
+
+model Branch {
+  id         Int       @id @default(autoincrement())
+  name       String
+  code       String?   @unique
+  address    String?
+  phone      String?
+  createdAt  DateTime  @default(now())
+
+  inventories Inventory[]
+  purchases   Purchase[]
+  sales       Sale[]
+  stockMovements StockMovement[]
+}
+
+// Category -> supports parent/child
+
+model Category {
+  id        Int        @id @default(autoincrement())
+  name      String
+  slug      String?    @unique
+  parentId  Int?
+  parent    Category?  @relation("SubCategory", fields: [parentId], references: [id], onUpdate: Cascade, onDelete: SetNull)
+  children  Category[] @relation("SubCategory")
+  products  Product[]
+
+  @@index([name])
+}
+
+// Product + Batch/Lot + Inventory per branch
+
+model Product {
+  id            Int             @id @default(autoincrement())
+  name          String
+  sku           String?         @unique
+  barcode       String?         @unique
+  description   String?
+  categoryId    Int
+  category      Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  companyId     Int
+  company       Company         @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  purchasePrice Decimal         @db.Decimal(12,2)
+  salePrice     Decimal         @db.Decimal(12,2)
+   
+  quantity      Int             @default(0)
+  reorderLevel  Int?            @default(10)
+  imageUrl      String?
+  isArchived    Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+ 
+  batches       ProductBatch[]
+  purchaseItems PurchaseItem[]
+  saleItems     SaleItem[]
+  stockMovements StockMovement[]
+  inventories   Inventory[]
+
+  @@index([name])
+}
+
+model ProductBatch {
+  id         Int      @id @default(autoincrement())
+  productId  Int
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  batchNo    String?
+  quantity   Int      @default(0)
+  expiryDate DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  purchaseItems PurchaseItem[]
+  saleItems     SaleItem[]
+  stockMovements StockMovement[]
+
+  @@index([productId])
+  @@index([expiryDate])
+}
+
+model Inventory {
+  id        Int      @id @default(autoincrement())
+  branchId  Int
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  quantity  Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([branchId, productId])
+  @@index([productId])
+}
+
+// Company (supplier) & payments
+
+model Company {
+  id            Int             @id @default(autoincrement())
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  dueAmount     Decimal?        @db.Decimal(12,2) @default(0)
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  products      Product[]
+  purchases     Purchase[]
+  companyPayments CompanyPayment[]
+}
+
+model CompanyPayment {
+  id         Int      @id @default(autoincrement())
+  companyId  Int
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  amount     Decimal  @db.Decimal(12,2)
+  method     PaymentMethod
+  paidAt     DateTime @default(now())
+  note       String?
+}
+
+// Purchase & PurchaseItem & Purchase Payments
+
+model Purchase {
+  id           Int             @id @default(autoincrement())
+  companyId    Int
+  company      Company         @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  invoiceNo    String
+  totalAmount  Decimal         @db.Decimal(12,2)
+  discount     Decimal?        @db.Decimal(12,2) @default(0)
+  vat          Decimal?        @db.Decimal(12,2) @default(0)
+  purchaseDate DateTime        @default(now())
+  createdById  Int?
+  createdBy    User?           @relation(fields: [createdById], references: [id], name: "UserPurchases", onDelete:SetNull, onUpdate: Cascade)
+  branchId     Int?            // branch where goods were received
+  branch       Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  items        PurchaseItem[]
+  payments     PurchasePayment[]
+  invoice      Invoice?
+  purchaseReturns PurchaseReturn[]
+
+  @@unique([invoiceNo])
+}
+
+model PurchaseItem {
+  id          Int       @id @default(autoincrement())
+  purchaseId  Int
+  productId   Int
+  batchId     Int?
+  quantity    Int
+  costPrice   Decimal   @db.Decimal(12,2)
+  purchase    Purchase  @relation(fields: [purchaseId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  batch       ProductBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+}
+
+model PurchasePayment {
+  id          Int      @id @default(autoincrement())
+  purchaseId  Int
+  amount      Decimal  @db.Decimal(12,2)
+  paidAt      DateTime @default(now())
+  method      PaymentMethod
+  note        String?
+  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+// Sale & SaleItem & Sale Payments & Customer
+
+model Customer {
+  id            Int       @id @default(autoincrement())
+  name          String?
+  phone         String?   @unique
+  email         String?   @unique
+  address       String?
+  loyaltyPoints Int       @default(0)
+  createdAt     DateTime  @default(now())
+
+  sales         Sale[]
+}
+
+model Sale {
+  id            Int        @id @default(autoincrement())
+  invoiceNo     String     @unique
+  totalAmount   Decimal    @db.Decimal(12,2)
+  discount      Decimal?   @db.Decimal(12,2) @default(0)
+  vat           Decimal?   @db.Decimal(12,2) @default(0)
+  paymentMethod PaymentMethod
+  saleDate      DateTime   @default(now())
+  createdById   Int
+  createdBy     User       @relation(fields: [createdById], references: [id], name: "UserSales", onDelete: Restrict, onUpdate: Cascade)
+  branchId      Int?
+  branch        Branch?    @relation(fields: [branchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  items         SaleItem[]
+  status        SaleStatus @default(COMPLETED)
+  customerId    Int?
+  customer      Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  payments      SalePayment[]
+  invoice       Invoice?
+  isReturned    Boolean    @default(false)
+  saleReturns   SaleReturn[]
+}
+
+model SaleItem {
+  id        Int      @id @default(autoincrement())
+  saleId    Int
+  productId Int
+  batchId   Int?
+  quantity  Int
+  price     Decimal  @db.Decimal(12,2)
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  batch     ProductBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+}
+
+model SalePayment {
+  id        Int      @id @default(autoincrement())
+  saleId    Int
+  amount    Decimal  @db.Decimal(12,2)
+  paidAt    DateTime @default(now())
+  method    PaymentMethod
+  note      String?
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+// Invoice (links to Sale or Purchase, stores file)
+
+model Invoice {
+  id         Int      @id @default(autoincrement())
+  saleId     Int?     @unique
+  purchaseId Int?     @unique
+  fileUrl    String
+  createdAt  DateTime @default(now())
+
+  sale      Sale?     @relation(fields: [saleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  purchase  Purchase? @relation(fields: [purchaseId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+// Stock movement / audit
+
+model StockMovement {
+  id           Int       @id @default(autoincrement())
+  productId    Int
+  batchId      Int?
+  branchId     Int?
+  change       Int       // + for incoming, - for outgoing
+  reason       StockReason
+  referenceType String?  // e.g., "SALE", "PURCHASE", "ADJUSTMENT"
+  referenceId  Int?      // e.g., saleId or purchaseId
+  createdById  Int?
+  createdAt    DateTime  @default(now())
+
+  product      Product   @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  batch        ProductBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  branch       Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+}
+
+// Returns (SaleReturn & PurchaseReturn) - minimal
+
+model SaleReturn {
+  id         Int      @id @default(autoincrement())
+  saleId     Int
+  returnDate DateTime @default(now())
+  totalAmount Decimal @db.Decimal(12,2)
+  reason     String?
+  createdById Int?
+  createdAt  DateTime @default(now())
+
+  sale       Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model PurchaseReturn {
+  id         Int      @id @default(autoincrement())
+  purchaseId Int
+  returnDate DateTime @default(now())
+  totalAmount Decimal @db.Decimal(12,2)
+  reason     String?
+  createdById Int?
+  createdAt  DateTime @default(now())
+
+  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+// Employee Module (documents, salary)
+
+model Employee {
+  id                Int             @id @default(autoincrement())
+  fullName          String
+  designation       String
+  department        String
+  joinDate          DateTime
+  exitDate          DateTime?
+  employmentType    String
+  status            EmployeeStatus  @default(ACTIVE)
+  phone             String
+  email             String?
+  presentAddress    String?
+  permanentAddress  String?
+  emergencyContact  String?
+  reasonForExit      String?
+  isArchived        Boolean         @default(false)
+  documents         EmployeeDocument[]
+  salaries          Salary[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model EmployeeDocument {
+  id          Int       @id @default(autoincrement())
+  employeeId  Int
+  docType     String
+  docUrl      String
+  fileType    String?
+  fileSize    Int?      // bytes
+  uploadedBy  Int?
+  uploadedAt  DateTime  @default(now())
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  uploadedByUser User?  @relation(fields: [uploadedBy], references: [id], name: "UserUploads", onDelete: SetNull, onUpdate: Cascade)
+}
+
+model Salary {
+  id          Int       @id @default(autoincrement())
+  employeeId  Int
+  month       String    // e.g., "2025-10"
+  basic       Decimal   @db.Decimal(12,2)
+  allowance   Decimal?  @db.Decimal(12,2)
+  bonus       Decimal?  @db.Decimal(12,2)
+  deduction   Decimal?  @db.Decimal(12,2)
+  total       Decimal   @db.Decimal(12,2)
+  paidDate    DateTime?
+  payslipUrl  String?
+  createdAt   DateTime  @default(now())
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([employeeId, month])
+}
+
+// Settings & Notifications (basic)
+
+model NotificationSetting {
+  id             Int      @id @default(autoincrement())
+  userId         Int?     @unique
+  lowStockThreshold Int?  @default(10)
+  dailySummary   Boolean  @default(false)
+  smsEnabled     Boolean  @default(false)
+  whatsappEnabled Boolean @default(false)
+  emailEnabled   Boolean  @default(true)
+  user           User?    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
