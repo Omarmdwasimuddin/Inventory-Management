@@ -43,81 +43,81 @@ const Sidebar = () => {
       name: 'Products',
       icon: <FiPackage size={20} />,
       submenu: [
-        { name: 'Product List', path: '/products' },
-        { name: 'Add Product', path: '/products/add' },
-        { name: 'Categories', path: '/products/categories' },
-        { name: 'Stock Adjustment', path: '/products/stock-adjustment' }
+        { name: 'Product List', path: '/adminDashboard/products/product-list' },
+        { name: 'Add Product', path: '/adminDashboard/products/add-product' },
+        { name: 'Categories', path: '/adminDashboard/products/categories' },
+        { name: 'Stock Adjustment', path: '/adminDashboard/products/stock-adjustment' }
       ]
     },
     {
       name: 'Sales',
       icon: <FiDollarSign size={20} />,
       submenu: [
-        { name: 'POS', path: '/sales/pos' },
-        { name: 'Sales List', path: '/sales' },
-        { name: 'Sale Returns', path: '/sales/returns' }
+        { name: 'POS', path: '/adminDashboard/pos' },
+        { name: 'Sales List', path: '/adminDashboard/sales-list' },
+        { name: 'Sale Returns', path: '/adminDashboard/sale-returns' }
       ]
     },
     {
       name: 'Purchases',
       icon: <FiShoppingCart size={20} />,
       submenu: [
-        { name: 'Add Purchase', path: '/purchases/add' },
-        { name: 'Purchase List', path: '/purchases' },
-        { name: 'Purchase Returns', path: '/purchases/returns' }
+        { name: 'Add Purchase', path: '/adminDashboard/add-purchase' },
+        { name: 'Purchase List', path: '/adminDashboard/purchase-list' },
+        { name: 'Purchase Returns', path: '/adminDashboard/purchase-returns' }
       ]
     },
     {
       name: 'Companies',
       icon: <FiBriefcase size={20} />, // FiBuilding এর পরিবর্তে FiBriefcase
       submenu: [
-        { name: 'Company List', path: '/companies' },
-        { name: 'Due Payments', path: '/companies/due-payments' }
+        { name: 'Company List', path: '/adminDashboard/company-list' },
+        { name: 'Due Payments', path: '/adminDashboard/due-payments' }
       ]
     },
     {
       name: 'Inventory',
       icon: <FiClipboard size={20} />,
       submenu: [
-        { name: 'Real-time Stock', path: '/inventory/real-time' },
-        { name: 'Low Stock', path: '/inventory/low-stock' },
-        { name: 'Batch/Expiry', path: '/inventory/batch-expiry' }
+        { name: 'Real-time Stock', path: '/adminDashboard/real-time-stock' },
+        { name: 'Low Stock', path: '/adminDashboard/low-stock' },
+        { name: 'Batch/Expiry', path: '/adminDashboard/batch-expiry' }
       ]
     },
     {
       name: 'Employees',
       icon: <FiUsers size={20} />,
       submenu: [
-        { name: 'Employee List', path: '/employees' },
-        { name: 'Add Employee', path: '/employees/add' },
-        { name: 'Salary', path: '/employees/salary' },
-        { name: 'Documents', path: '/employees/documents' }
+        { name: 'Employee List', path: '/adminDashboard/employee-list' },
+        { name: 'Add Employee', path: '/adminDashboard/add-employee' },
+        { name: 'Salary', path: '/adminDashboard/salary' },
+        { name: 'Documents', path: '/adminDashboard/documents' }
       ]
     },
     {
       name: 'Reports',
       icon: <FiBarChart2 size={20} />,
-      path: '/reports'
+      path: '/adminDashboard/reports'
     },
     {
       name: 'Settings',
       icon: <FiSettings size={20} />,
-      path: '/settings'
+      path: '/adminDashboard/settings'
     },
     {
       name: 'Users',
       icon: <FiUser size={20} />,
-      path: '/users'
+      path: '/adminDashboard/users'
     },
     {
       name: 'Branches',
       icon: <FiMapPin size={20} />,
-      path: '/branches'
+      path: '/adminDashboard/branches'
     },
     {
       name: 'Notifications',
       icon: <FiBell size={20} />,
-      path: '/notifications'
+      path: '/adminDashboard/notifications'
     }
   ];
 
