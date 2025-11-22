@@ -5,6 +5,7 @@ const page = () => {
     return (
         <div>
             <Login/>
+            <h1>hello</h1>
         </div>
     );
 };
